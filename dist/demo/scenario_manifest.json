@@ -1,0 +1,110 @@
+{
+  "version": "0.7",
+  "days": 5,
+  "planners": [
+    {
+      "name": "Planner 1 - Emma Borg",
+      "buyer": "EBORG",
+      "suppliers": [
+        "TSE Electronics",
+        "Nova Components",
+        "Baltic Connectors"
+      ],
+      "cells": [
+        "405",
+        "406",
+        "410"
+      ],
+      "problem": "Supplier capacity reduction"
+    },
+    {
+      "name": "Planner 2 - Liam Camilleri",
+      "buyer": "LCAM",
+      "suppliers": [
+        "Apex Semiconductors",
+        "Orion Plastics",
+        "Delta Moldings"
+      ],
+      "cells": [
+        "412",
+        "414",
+        "416"
+      ],
+      "problem": "Demand spike and missing promise"
+    },
+    {
+      "name": "Planner 3 - Sarah Vella",
+      "buyer": "SVELL",
+      "suppliers": [
+        "EuroWire Systems",
+        "Magna Sensors",
+        "Helix Cables"
+      ],
+      "cells": [
+        "420",
+        "421",
+        "425"
+      ],
+      "problem": "Logistics delay and ASN recovery"
+    },
+    {
+      "name": "Planner 4 - Daniel Attard",
+      "buyer": "DATTA",
+      "suppliers": [
+        "Prime PCB",
+        "Vector Circuits",
+        "Atlas Microtech"
+      ],
+      "cells": [
+        "430",
+        "431",
+        "435"
+      ],
+      "problem": "Quality hold and split shipment"
+    },
+    {
+      "name": "Planner 5 - Maya Grech",
+      "buyer": "MGREC",
+      "suppliers": [
+        "Zenith Metals",
+        "CoreTech Fasteners",
+        "Nexus Packaging"
+      ],
+      "cells": [
+        "440",
+        "442",
+        "445"
+      ],
+      "problem": "Past-due escalation and supplier recovery"
+    }
+  ],
+  "rows_per_report": 120,
+  "format_columns": [
+    "Buyer",
+    "Supplier",
+    "Part Number",
+    "Part Description",
+    "Production Cell (Res.)",
+    "Past Due",
+    "Week 29",
+    "Week 30",
+    "Week 31",
+    "Week 32",
+    "Week 33",
+    "Week 34",
+    "Week 35",
+    "Week 36",
+    "Week 37",
+    "Week 38",
+    "Week 39",
+    "Open Purchase Orders",
+    "Promised Quantity",
+    "Promised Date",
+    "ASN Quantity",
+    "ASN Date",
+    "Supplier Message",
+    "Last Updated",
+    "User"
+  ],
+  "notes": "All daily reports use the same Expedite-style structure. Values are simulated and intended for SC360 testing and demos."
+}
