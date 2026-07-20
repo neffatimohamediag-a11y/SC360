@@ -117,6 +117,6 @@ function Dashboard({snapshots,onReset}:{snapshots:Analysis[];onReset:()=>void}){
 export function App(){
  const [snapshots,setSnapshots]=useState<Analysis[]>([]),[loading,setLoading]=useState(false),[error,setError]=useState('')
  async function load(f:File){setLoading(true);setError('');try{setSnapshots([await analyseFile(f)])}catch(e){setError(e instanceof Error?e.message:'The file could not be analysed.')}finally{setLoading(false)}}
- async function demo(){setLoading(true);setError('');try{const all:Analysis[]=[];for(const [,d] of demoDays){const r=await fetch(`./demo/Expedite_Demo_${d}.xlsx`);if(!r.ok)throw new Error(`Demo snapshot ${d} is missing.`);all.push(await analyseBuffer(await r.arrayBuffer(),`Expedite_Demo_${d}.xlsx`))}setSnapshots(all)}catch(e){setError(e instanceof Error?e.message:'Demo Factory could not be loaded.')}finally{setLoading(false)}}
+ async function demo(){setLoading(true);setError('');try{const all:Analysis[]=[];for(const [,d] of demoDays){const r=await fetch(`./demo/requirement_Demo_${d}.xlsx`);if(!r.ok)throw new Error(`Demo snapshot ${d} is missing.`);all.push(await analyseBuffer(await r.arrayBuffer(),`requirement_Demo_${d}.xlsx`))}setSnapshots(all)}catch(e){setError(e instanceof Error?e.message:'Demo Factory could not be loaded.')}finally{setLoading(false)}}
  return snapshots.length?<Dashboard snapshots={snapshots} onReset={()=>setSnapshots([])}/>:<Upload onLoad={load} onDemo={demo} loading={loading} error={error}/>
 }
