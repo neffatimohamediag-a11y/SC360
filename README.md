@@ -1,4 +1,4 @@
-# SC360 Expedite Intelligence v0.8.0 - No Install
+# SC360 Supply chain Intelligence v0.8.0 - No Install
 
 ## Start on Windows
 Double-click `START_SC360_WINDOWS.bat`.
