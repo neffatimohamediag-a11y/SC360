@@ -851,7 +851,10 @@ const scoreContext = {
           ))}
         </div>
       </article>
-<ResinScoreExplainer context={scoreContext} />
+      <ResinScoreExplainer context={scoreContext} />
+
+      <ResinDecisionSimulator resins={simulatorResins} />
+
       <div className="resin-disclosure">
         <strong>Data methodology</strong>
 
@@ -865,10 +868,4 @@ const scoreContext = {
       </div>
     </section>
   )
-  
 }
-<ResinScoreExplainer context={scoreContext} />
-
-<ResinDecisionSimulator resins={simulatorResins} />
-
-<div className="resin-disclosure">
