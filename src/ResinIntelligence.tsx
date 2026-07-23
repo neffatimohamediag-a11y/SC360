@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-
+import { ResinScoreExplainer } from './ResinScoreExplainer'
 type Risk = 'Low' | 'Medium' | 'High' | 'Critical'
 type Period = '30D' | '90D' | '1Y'
 type ChartMode = 'pressure' | 'brent' | 'gas' | 'eurusd'
@@ -427,7 +427,68 @@ export function ResinIntelligence() {
 
   const selected =
     signals.find(signal => signal.code === selectedCode) ?? signals[0]
+const selectedDefinition =
+  resinDefinitions.find(
+    definition => definition.code === selected.code,
+  ) ?? resinDefinitions[0]
 
+const driverMap = new Map(
+  drivers.map(driver => [driver.id, driver]),
+)
+
+function buildContribution(
+  id: string,
+  name: string,
+  weight: number,
+  direction = 1,
+) {
+  const driver = driverMap.get(id)
+  const liveChange = driver?.change ?? 0
+
+  return {
+    id,
+    name,
+    liveChange,
+    weight,
+    contribution:
+      liveChange *
+      weight *
+      selectedDefinition.sensitivity *
+      direction,
+    source: driver?.source ?? 'Source unavailable',
+    updatedAt: driver?.updatedAt ?? 'Unavailable',
+  }
+}
+
+const scoreContext = {
+  code: selected.code,
+  name: selected.name,
+  pressure: selected.pressure,
+  calculatedChange: selected.change,
+  risk: selected.risk,
+  recommendation:
+    selected.change >= 0
+      ? selected.recommendationUp
+      : selected.recommendationDown,
+  contributions: [
+    buildContribution(
+      'brent',
+      'Brent crude',
+      selectedDefinition.oilWeight,
+    ),
+    buildContribution(
+      'gas',
+      'Natural gas',
+      selectedDefinition.gasWeight,
+    ),
+    buildContribution(
+      'eurusd',
+      'EUR/USD',
+      selectedDefinition.currencyWeight,
+      -1,
+    ),
+  ],
+}
   const chartData = useMemo(() => {
   if (chartMode === 'pressure') {
     const pressureValues =
@@ -780,7 +841,7 @@ export function ResinIntelligence() {
           ))}
         </div>
       </article>
-
+<ResinScoreExplainer context={scoreContext} />
       <div className="resin-disclosure">
         <strong>Data methodology</strong>
 
