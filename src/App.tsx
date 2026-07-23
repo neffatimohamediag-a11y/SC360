@@ -754,7 +754,7 @@ function Dashboard({snapshots,onReset}:{snapshots:Analysis[];onReset:()=>void}){
   />
 )}
 </div>
-)
+
 }
 
 export function App(){
