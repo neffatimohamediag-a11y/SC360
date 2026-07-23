@@ -1,131 +1,133 @@
 import { useEffect, useMemo, useState } from 'react'
 
-type Direction = 'up' | 'down' | 'stable'
 type Risk = 'Low' | 'Medium' | 'High' | 'Critical'
 type Period = '30D' | '90D' | '1Y'
 
-type Resin = {
-  code: string
-  name: string
-  change30d: number
-  pressure: number
-  volatility: number
-  risk: Risk
-  direction: Direction
-  recommendation: string
-  history: number[]
+type DriverHistory = {
+  period: string
+  value: number
 }
 
 type MarketDriver = {
   id: string
   name: string
-  value: string
+  value: number
   change: number
   unit: string
   source: string
   updatedAt: string
   status: 'live' | 'fallback'
+  history?: DriverHistory[]
 }
 
-const resinData: Resin[] = [
+type ResinDefinition = {
+  code: string
+  name: string
+  oilWeight: number
+  gasWeight: number
+  currencyWeight: number
+  sensitivity: number
+  recommendationUp: string
+  recommendationDown: string
+}
+
+type ResinSignal = ResinDefinition & {
+  change: number
+  pressure: number
+  risk: Risk
+  history: number[]
+}
+
+const resinDefinitions: ResinDefinition[] = [
   {
     code: 'ABS',
     name: 'Acrylonitrile Butadiene Styrene',
-    change30d: 2.6,
-    pressure: 78,
-    volatility: 67,
-    risk: 'High',
-    direction: 'up',
-    recommendation: 'Review open quotations and negotiate validity extensions.',
-    history: [93, 94, 94, 96, 97, 99, 100, 102, 103, 105, 106, 108],
+    oilWeight: 0.5,
+    gasWeight: 0.25,
+    currencyWeight: 0.25,
+    sensitivity: 1.2,
+    recommendationUp: 'Review quotations and negotiate validity extensions.',
+    recommendationDown: 'Request refreshed quotations before placing coverage.',
   },
   {
     code: 'PP',
     name: 'Polypropylene',
-    change30d: -1.4,
-    pressure: 38,
-    volatility: 34,
-    risk: 'Low',
-    direction: 'down',
-    recommendation: 'Use the softer market as a negotiation opportunity.',
-    history: [104, 103, 102, 103, 101, 100, 99, 99, 98, 97, 97, 96],
+    oilWeight: 0.65,
+    gasWeight: 0.2,
+    currencyWeight: 0.15,
+    sensitivity: 1,
+    recommendationUp: 'Review propylene-linked supplier pricing.',
+    recommendationDown: 'Use the softer signal as a negotiation opportunity.',
   },
   {
     code: 'HDPE',
     name: 'High-density Polyethylene',
-    change30d: 0.9,
-    pressure: 54,
-    volatility: 42,
-    risk: 'Medium',
-    direction: 'up',
-    recommendation: 'Monitor feedstock movement before committing long-term volume.',
-    history: [98, 98, 99, 100, 99, 100, 101, 101, 102, 102, 103, 104],
+    oilWeight: 0.55,
+    gasWeight: 0.3,
+    currencyWeight: 0.15,
+    sensitivity: 0.95,
+    recommendationUp: 'Review upcoming PE demand and contract coverage.',
+    recommendationDown: 'Request revised supplier offers before committing.',
   },
   {
     code: 'LDPE',
     name: 'Low-density Polyethylene',
-    change30d: -0.5,
-    pressure: 43,
-    volatility: 38,
-    risk: 'Low',
-    direction: 'down',
-    recommendation: 'Delay non-critical coverage and request refreshed quotations.',
-    history: [103, 103, 102, 102, 101, 101, 100, 100, 99, 99, 98, 98],
+    oilWeight: 0.5,
+    gasWeight: 0.35,
+    currencyWeight: 0.15,
+    sensitivity: 1,
+    recommendationUp: 'Monitor energy and ethylene-related supplier revisions.',
+    recommendationDown: 'Delay non-critical coverage where operationally safe.',
   },
   {
     code: 'PA6',
     name: 'Polyamide 6',
-    change30d: 3.1,
-    pressure: 74,
-    volatility: 63,
-    risk: 'High',
-    direction: 'up',
-    recommendation: 'Review supplier capacity and upcoming contract expirations.',
-    history: [91, 92, 94, 94, 96, 97, 99, 100, 102, 104, 106, 107],
+    oilWeight: 0.4,
+    gasWeight: 0.4,
+    currencyWeight: 0.2,
+    sensitivity: 1.25,
+    recommendationUp: 'Review supplier capacity and contract expirations.',
+    recommendationDown: 'Seek improved conversion and energy surcharges.',
   },
   {
     code: 'PA66',
     name: 'Polyamide 66',
-    change30d: 5.4,
-    pressure: 89,
-    volatility: 81,
-    risk: 'Critical',
-    direction: 'up',
-    recommendation: 'Begin an immediate commercial and supply-risk review.',
-    history: [88, 90, 91, 94, 96, 99, 101, 105, 108, 112, 116, 121],
+    oilWeight: 0.35,
+    gasWeight: 0.45,
+    currencyWeight: 0.2,
+    sensitivity: 1.45,
+    recommendationUp: 'Begin an immediate commercial and supply-risk review.',
+    recommendationDown: 'Validate availability before delaying purchases.',
   },
   {
     code: 'PC',
     name: 'Polycarbonate',
-    change30d: 0.1,
-    pressure: 49,
-    volatility: 36,
-    risk: 'Medium',
-    direction: 'stable',
-    recommendation: 'Maintain current coverage and monitor energy indicators.',
-    history: [100, 101, 100, 100, 99, 100, 100, 101, 100, 100, 101, 100],
+    oilWeight: 0.4,
+    gasWeight: 0.4,
+    currencyWeight: 0.2,
+    sensitivity: 1.15,
+    recommendationUp: 'Review energy-related supplier surcharges.',
+    recommendationDown: 'Request updated offers for non-contracted volume.',
   },
   {
     code: 'POM',
     name: 'Polyoxymethylene',
-    change30d: 1.8,
-    pressure: 61,
-    volatility: 48,
-    risk: 'Medium',
-    direction: 'up',
-    recommendation: 'Request updated supplier cost breakdowns.',
-    history: [95, 96, 96, 97, 98, 99, 99, 100, 101, 102, 103, 105],
+    oilWeight: 0.35,
+    gasWeight: 0.45,
+    currencyWeight: 0.2,
+    sensitivity: 1.1,
+    recommendationUp: 'Request supplier cost-driver transparency.',
+    recommendationDown: 'Use the lower signal in commercial negotiations.',
   },
   {
     code: 'PVC',
     name: 'Polyvinyl Chloride',
-    change30d: -0.7,
-    pressure: 40,
-    volatility: 31,
-    risk: 'Low',
-    direction: 'down',
-    recommendation: 'Consider short-term volume consolidation.',
-    history: [104, 103, 103, 102, 101, 101, 100, 99, 99, 98, 98, 97],
+    oilWeight: 0.3,
+    gasWeight: 0.5,
+    currencyWeight: 0.2,
+    sensitivity: 0.9,
+    recommendationUp: 'Review energy and conversion-cost exposure.',
+    recommendationDown: 'Consider short-term volume consolidation.',
   },
 ]
 
@@ -133,64 +135,90 @@ const fallbackDrivers: MarketDriver[] = [
   {
     id: 'brent',
     name: 'Brent crude',
-    value: '82.40',
-    change: 2.3,
+    value: 0,
+    change: 0,
     unit: 'USD/bbl',
-    source: 'Market connector',
-    updatedAt: 'Fallback data',
+    source: 'Waiting for EIA',
+    updatedAt: 'Unavailable',
     status: 'fallback',
   },
   {
     id: 'gas',
-    name: 'Natural gas',
-    value: '34.70',
-    change: 4.1,
-    unit: 'EUR/MWh',
-    source: 'Energy connector',
-    updatedAt: 'Fallback data',
+    name: 'Henry Hub natural gas',
+    value: 0,
+    change: 0,
+    unit: 'USD/MMBtu',
+    source: 'Waiting for EIA',
+    updatedAt: 'Unavailable',
     status: 'fallback',
   },
   {
     id: 'eurusd',
     name: 'EUR/USD',
-    value: '1.17',
-    change: -0.4,
+    value: 0,
+    change: 0,
     unit: '',
-    source: 'Currency connector',
-    updatedAt: 'Fallback data',
-    status: 'fallback',
-  },
-  {
-    id: 'freight',
-    name: 'Container freight',
-    value: '1,940',
-    change: -1.8,
-    unit: 'USD/FEU',
-    source: 'Freight connector',
-    updatedAt: 'Fallback data',
+    source: 'Waiting for ECB',
+    updatedAt: 'Unavailable',
     status: 'fallback',
   },
 ]
 
-function RiskBadge({ risk }: { risk: Risk }) {
-  return (
-    <span className={`resin-risk resin-risk-${risk.toLowerCase()}`}>
-      {risk}
-    </span>
-  )
+function clamp(value: number, minimum: number, maximum: number) {
+  return Math.min(maximum, Math.max(minimum, value))
 }
 
-function TrendArrow({ direction }: { direction: Direction }) {
-  return (
-    <span className={`resin-direction resin-direction-${direction}`}>
-      {direction === 'up' ? '↑' : direction === 'down' ? '↓' : '→'}
-    </span>
-  )
+function riskFromPressure(pressure: number): Risk {
+  if (pressure >= 78) return 'Critical'
+  if (pressure >= 62) return 'High'
+  if (pressure >= 45) return 'Medium'
+  return 'Low'
 }
 
-function Sparkline({ values }: { values: number[] }) {
-  const width = 520
-  const height = 190
+function formatValue(driver: MarketDriver) {
+  if (!driver.value) return '—'
+
+  return driver.value.toLocaleString('en-US', {
+    minimumFractionDigits: driver.id === 'eurusd' ? 4 : 2,
+    maximumFractionDigits: driver.id === 'eurusd' ? 4 : 2,
+  })
+}
+
+function calculateSignals(drivers: MarketDriver[]): ResinSignal[] {
+  const driverMap = new Map(drivers.map(driver => [driver.id, driver]))
+
+  const oil = driverMap.get('brent')?.change ?? 0
+  const gas = driverMap.get('gas')?.change ?? 0
+  const currency = driverMap.get('eurusd')?.change ?? 0
+
+  return resinDefinitions.map(definition => {
+    const change =
+      (oil * definition.oilWeight +
+        gas * definition.gasWeight -
+        currency * definition.currencyWeight) *
+      definition.sensitivity
+
+    const roundedChange = Number(change.toFixed(2))
+    const pressure = Math.round(clamp(50 + roundedChange * 6, 5, 95))
+
+    const history = Array.from({ length: 12 }, (_, index) => {
+      const progress = index / 11
+      return Number((100 + roundedChange * progress).toFixed(2))
+    })
+
+    return {
+      ...definition,
+      change: roundedChange,
+      pressure,
+      risk: riskFromPressure(pressure),
+      history,
+    }
+  })
+}
+
+function TrendChart({ values }: { values: number[] }) {
+  const width = 620
+  const height = 220
   const minimum = Math.min(...values)
   const maximum = Math.max(...values)
   const range = Math.max(maximum - minimum, 1)
@@ -198,7 +226,7 @@ function Sparkline({ values }: { values: number[] }) {
   const points = values
     .map((value, index) => {
       const x = (index / Math.max(values.length - 1, 1)) * width
-      const y = height - ((value - minimum) / range) * (height - 24) - 12
+      const y = height - 18 - ((value - minimum) / range) * (height - 36)
       return `${x},${y}`
     })
     .join(' ')
@@ -208,16 +236,19 @@ function Sparkline({ values }: { values: number[] }) {
       className="resin-main-chart"
       viewBox={`0 0 ${width} ${height}`}
       role="img"
-      aria-label="Selected resin market trend"
+      aria-label="Calculated resin pressure trend"
     >
-      <line x1="0" y1="35" x2={width} y2="35" />
-      <line x1="0" y1="95" x2={width} y2="95" />
-      <line x1="0" y1="155" x2={width} y2="155" />
+      <line x1="0" y1="45" x2={width} y2="45" />
+      <line x1="0" y1="110" x2={width} y2="110" />
+      <line x1="0" y1="175" x2={width} y2="175" />
       <polyline points={points} />
+
       {values.map((value, index) => {
         const x = (index / Math.max(values.length - 1, 1)) * width
-        const y = height - ((value - minimum) / range) * (height - 24) - 12
-        return <circle key={`${value}-${index}`} cx={x} cy={y} r="3" />
+        const y =
+          height - 18 - ((value - minimum) / range) * (height - 36)
+
+        return <circle key={`${index}-${value}`} cx={x} cy={y} r="3" />
       })}
     </svg>
   )
@@ -228,24 +259,58 @@ export function ResinIntelligence() {
   const [period, setPeriod] = useState<Period>('1Y')
   const [drivers, setDrivers] =
     useState<MarketDriver[]>(fallbackDrivers)
-  const [refreshing, setRefreshing] = useState(false)
-  const [lastRefresh, setLastRefresh] = useState('Not connected')
+
+  const [loading, setLoading] = useState(true)
+  const [message, setMessage] = useState('Connecting to market sources…')
+
+  async function refresh() {
+    setLoading(true)
+
+    try {
+      const response = await fetch('/api/market-drivers')
+
+      if (!response.ok) {
+        throw new Error(`Market service returned ${response.status}`)
+      }
+
+      const payload = (await response.json()) as {
+        drivers?: MarketDriver[]
+        errors?: string[]
+        updatedAt?: string
+      }
+
+      if (!payload.drivers?.length) {
+        throw new Error('No live market drivers were returned')
+      }
+
+      setDrivers(payload.drivers)
+      setMessage(
+        payload.errors?.length
+          ? `Live with ${payload.errors.length} source warning(s)`
+          : `Live sources updated ${new Date(
+              payload.updatedAt ?? Date.now(),
+            ).toLocaleString()}`,
+      )
+    } catch (error) {
+      setDrivers(fallbackDrivers)
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : 'Live market sources are unavailable',
+      )
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    void refresh()
+  }, [])
+
+  const signals = useMemo(() => calculateSignals(drivers), [drivers])
 
   const selected =
-    resinData.find((resin) => resin.code === selectedCode) ?? resinData[0]
-
-  const marketPressure = Math.round(
-    resinData.reduce((sum, resin) => sum + resin.pressure, 0) /
-      resinData.length,
-  )
-
-  const opportunities = resinData.filter(
-    (resin) => resin.direction === 'down',
-  ).length
-
-  const criticalAlerts = resinData.filter(
-    (resin) => resin.risk === 'High' || resin.risk === 'Critical',
-  ).length
+    signals.find(signal => signal.code === selectedCode) ?? signals[0]
 
   const visibleHistory = useMemo(() => {
     if (period === '30D') return selected.history.slice(-4)
@@ -253,51 +318,22 @@ export function ResinIntelligence() {
     return selected.history
   }, [period, selected])
 
-  async function refreshMarketData() {
-    setRefreshing(true)
+  const marketPressure = Math.round(
+    signals.reduce((sum, signal) => sum + signal.pressure, 0) /
+      signals.length,
+  )
 
-    try {
-      /*
-       * First-release connector contract.
-       *
-       * The SC360 server should expose:
-       * GET /api/market/drivers
-       *
-       * Expected response:
-       * {
-       *   "drivers": MarketDriver[]
-       * }
-       *
-       * Until that route is connected to licensed/public feeds,
-       * the UI keeps its clearly marked fallback values.
-       */
-      const response = await fetch('/api/market/drivers')
+  const opportunities = signals.filter(signal => signal.change < -0.25).length
 
-      if (!response.ok) {
-        throw new Error(`Market API returned ${response.status}`)
-      }
+  const priorityAlerts = signals.filter(
+    signal => signal.risk === 'High' || signal.risk === 'Critical',
+  ).length
 
-      const payload = (await response.json()) as {
-        drivers?: MarketDriver[]
-      }
+  const highestExposure = [...signals].sort(
+    (left, right) => right.pressure - left.pressure,
+  )[0]
 
-      if (!payload.drivers?.length) {
-        throw new Error('Market API returned no drivers')
-      }
-
-      setDrivers(payload.drivers)
-      setLastRefresh(new Date().toLocaleString())
-    } catch {
-      setDrivers(fallbackDrivers)
-      setLastRefresh('Connector unavailable — fallback data displayed')
-    } finally {
-      setRefreshing(false)
-    }
-  }
-
-  useEffect(() => {
-    void refreshMarketData()
-  }, [])
+  const liveCount = drivers.filter(driver => driver.status === 'live').length
 
   return (
     <section className="resin-intelligence">
@@ -305,35 +341,37 @@ export function ResinIntelligence() {
         <div>
           <span className="eyebrow">SC360 Market Intelligence</span>
           <h2>Resin Intelligence</h2>
+
           <p>
-            External market signals translated into practical buyer decisions.
+            Live upstream indicators translated into calculated resin
+            purchasing signals.
           </p>
         </div>
 
         <div className="resin-live-area">
           <span
             className={
-              drivers.some((driver) => driver.status === 'live')
+              liveCount > 0
                 ? 'resin-live resin-live-active'
                 : 'resin-live'
             }
           >
             <i />
-            {drivers.some((driver) => driver.status === 'live')
-              ? 'Live sources connected'
-              : 'Fallback market data'}
+            {liveCount > 0
+              ? `${liveCount} live sources`
+              : 'Sources unavailable'}
           </span>
 
           <button
-            className="secondary"
             type="button"
-            onClick={() => void refreshMarketData()}
-            disabled={refreshing}
+            className="secondary"
+            onClick={() => void refresh()}
+            disabled={loading}
           >
-            {refreshing ? 'Refreshing…' : 'Refresh market'}
+            {loading ? 'Refreshing…' : 'Refresh market'}
           </button>
 
-          <small>{lastRefresh}</small>
+          <small>{message}</small>
         </div>
       </div>
 
@@ -341,54 +379,73 @@ export function ResinIntelligence() {
         <article>
           <span>Market pressure</span>
           <strong>{marketPressure}</strong>
-          <small>Composite resin pressure score</small>
+          <small>Calculated composite index</small>
         </article>
 
         <article>
           <span>Buying opportunities</span>
           <strong>{opportunities}</strong>
-          <small>Materials with downward momentum</small>
+          <small>Resins with downward signals</small>
         </article>
 
         <article>
           <span>Priority alerts</span>
-          <strong>{criticalAlerts}</strong>
-          <small>High and critical materials</small>
+          <strong>{priorityAlerts}</strong>
+          <small>High and critical pressure</small>
         </article>
 
         <article>
           <span>Highest exposure</span>
-          <strong>PA66</strong>
-          <small>Pressure score 89</small>
+          <strong>{highestExposure.code}</strong>
+          <small>Pressure score {highestExposure.pressure}</small>
         </article>
       </div>
 
       <div className="resin-card-grid">
-        {resinData.map((resin) => (
+        {signals.map(signal => (
           <button
             type="button"
-            key={resin.code}
+            key={signal.code}
             className={
-              selected.code === resin.code
+              selected.code === signal.code
                 ? 'resin-material-card selected'
                 : 'resin-material-card'
             }
-            onClick={() => setSelectedCode(resin.code)}
+            onClick={() => setSelectedCode(signal.code)}
           >
             <div>
-              <span>{resin.name}</span>
-              <strong>{resin.code}</strong>
+              <span>{signal.name}</span>
+              <strong>{signal.code}</strong>
             </div>
 
             <div className="resin-material-change">
-              <TrendArrow direction={resin.direction} />
+              <span
+                className={`resin-direction ${
+                  signal.change > 0.1
+                    ? 'resin-direction-up'
+                    : signal.change < -0.1
+                      ? 'resin-direction-down'
+                      : 'resin-direction-stable'
+                }`}
+              >
+                {signal.change > 0.1
+                  ? '↑'
+                  : signal.change < -0.1
+                    ? '↓'
+                    : '→'}
+              </span>
+
               <b>
-                {resin.change30d > 0 ? '+' : ''}
-                {resin.change30d.toFixed(1)}%
+                {signal.change > 0 ? '+' : ''}
+                {signal.change.toFixed(1)}%
               </b>
             </div>
 
-            <RiskBadge risk={resin.risk} />
+            <span
+              className={`resin-risk resin-risk-${signal.risk.toLowerCase()}`}
+            >
+              {signal.risk}
+            </span>
           </button>
         ))}
       </div>
@@ -397,14 +454,14 @@ export function ResinIntelligence() {
         <article className="panel resin-chart-panel">
           <div className="panel-head">
             <div>
-              <span>Market trend</span>
+              <span>Calculated resin pressure trend</span>
               <h3>
                 {selected.code} · {selected.name}
               </h3>
             </div>
 
             <div className="resin-periods">
-              {(['30D', '90D', '1Y'] as Period[]).map((item) => (
+              {(['30D', '90D', '1Y'] as Period[]).map(item => (
                 <button
                   type="button"
                   key={item}
@@ -417,14 +474,14 @@ export function ResinIntelligence() {
             </div>
           </div>
 
-          <Sparkline values={visibleHistory} />
+          <TrendChart values={visibleHistory} />
 
           <div className="resin-chart-summary">
             <div>
-              <span>30-day movement</span>
+              <span>Calculated movement</span>
               <strong>
-                {selected.change30d > 0 ? '+' : ''}
-                {selected.change30d.toFixed(1)}%
+                {selected.change > 0 ? '+' : ''}
+                {selected.change.toFixed(2)}%
               </strong>
             </div>
 
@@ -434,32 +491,32 @@ export function ResinIntelligence() {
             </div>
 
             <div>
-              <span>Volatility</span>
-              <strong>{selected.volatility}/100</strong>
+              <span>Risk</span>
+              <strong>{selected.risk}</strong>
             </div>
 
             <div>
-              <span>Risk</span>
-              <RiskBadge risk={selected.risk} />
+              <span>Method</span>
+              <strong>SC360 index</strong>
             </div>
           </div>
         </article>
 
         <aside className="panel resin-recommendation">
           <span className="eyebrow">SCOUT buyer assessment</span>
+
           <h3>
             {selected.code}{' '}
-            {selected.direction === 'up'
-              ? 'cost pressure is increasing.'
-              : selected.direction === 'down'
+            {selected.change > 0.25
+              ? 'is showing increasing upstream pressure.'
+              : selected.change < -0.25
                 ? 'is entering a softer buying window.'
-                : 'is currently stable.'}
+                : 'is currently showing a stable signal.'}
           </h3>
 
           <p>
-            The current signal combines market direction, volatility and
-            upstream cost pressure. It is a decision-support indicator rather
-            than a quoted resin price.
+            This signal combines live crude-oil, natural-gas and currency
+            movements. It is not an official quoted resin price.
           </p>
 
           <div className="resin-pressure-bar">
@@ -468,29 +525,32 @@ export function ResinIntelligence() {
 
           <div className="recommend">
             <span>Recommended buyer action</span>
-            <strong>{selected.recommendation}</strong>
-          </div>
 
-          <button type="button" className="primary">
-            Create sourcing review
-          </button>
+            <strong>
+              {selected.change >= 0
+                ? selected.recommendationUp
+                : selected.recommendationDown}
+            </strong>
+          </div>
         </aside>
       </div>
 
       <article className="panel resin-drivers-panel">
         <div className="panel-head">
           <div>
-            <span>Upstream intelligence</span>
+            <span>Live upstream intelligence</span>
             <h3>Market drivers</h3>
           </div>
-          <small>Source status is shown on every card</small>
+
+          <small>Official source and observation date shown below</small>
         </div>
 
         <div className="resin-driver-grid">
-          {drivers.map((driver) => (
+          {drivers.map(driver => (
             <article key={driver.id}>
               <div>
                 <span>{driver.name}</span>
+
                 <small
                   className={
                     driver.status === 'live'
@@ -498,18 +558,17 @@ export function ResinIntelligence() {
                       : 'driver-source'
                   }
                 >
-                  {driver.status === 'live' ? 'LIVE' : 'FALLBACK'}
+                  {driver.status === 'live' ? 'LIVE' : 'UNAVAILABLE'}
                 </small>
               </div>
 
               <strong>
-                {driver.value}{' '}
-                <small>{driver.unit}</small>
+                {formatValue(driver)} <small>{driver.unit}</small>
               </strong>
 
               <b className={driver.change >= 0 ? 'positive' : 'negative'}>
                 {driver.change >= 0 ? '↑' : '↓'}{' '}
-                {Math.abs(driver.change).toFixed(1)}%
+                {Math.abs(driver.change).toFixed(2)}%
               </b>
 
               <footer>
@@ -522,11 +581,14 @@ export function ResinIntelligence() {
       </article>
 
       <div className="resin-disclosure">
-        <strong>First-release data policy</strong>
+        <strong>Data methodology</strong>
+
         <span>
-          Resin values are representative market indices until licensed resin
-          feeds are connected. Live and fallback values are never presented as
-          equivalent.
+          Oil and natural-gas observations come from the U.S. EIA.
+          EUR/USD observations come from the European Central Bank.
+          Resin-family movements are calculated SC360 pressure indices,
+          not official market quotations. Exact regional resin prices
+          require a licensed resin-market data provider.
         </span>
       </div>
     </section>
