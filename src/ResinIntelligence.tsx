@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 
 type Risk = 'Low' | 'Medium' | 'High' | 'Critical'
 type Period = '30D' | '90D' | '1Y'
-
+type ChartMode = 'pressure' | 'brent' | 'gas' | 'eurusd'
 type DriverHistory = {
   period: string
   value: number
@@ -216,46 +216,162 @@ function calculateSignals(drivers: MarketDriver[]): ResinSignal[] {
   })
 }
 
-function TrendChart({ values }: { values: number[] }) {
-  const width = 620
-  const height = 220
+function TrendChart({
+  values,
+  labels,
+  unit,
+}: {
+  values: number[]
+  labels?: string[]
+  unit?: string
+}) {
+  const width = 720
+  const height = 280
+  const paddingLeft = 58
+  const paddingRight = 22
+  const paddingTop = 20
+  const paddingBottom = 38
+
+  if (!values.length) {
+    return (
+      <div className="resin-chart-empty">
+        No historical observations are available.
+      </div>
+    )
+  }
+
   const minimum = Math.min(...values)
   const maximum = Math.max(...values)
-  const range = Math.max(maximum - minimum, 1)
+  const rawRange = maximum - minimum
+  const range = rawRange || Math.max(Math.abs(maximum) * 0.05, 1)
+  const lowerBound = minimum - range * 0.12
+  const upperBound = maximum + range * 0.12
+  const boundedRange = upperBound - lowerBound
+
+  const chartWidth = width - paddingLeft - paddingRight
+  const chartHeight = height - paddingTop - paddingBottom
+
+  const getX = (index: number) =>
+    paddingLeft +
+    (index / Math.max(values.length - 1, 1)) * chartWidth
+
+  const getY = (value: number) =>
+    paddingTop +
+    chartHeight -
+    ((value - lowerBound) / boundedRange) * chartHeight
 
   const points = values
-    .map((value, index) => {
-      const x = (index / Math.max(values.length - 1, 1)) * width
-      const y = height - 18 - ((value - minimum) / range) * (height - 36)
-      return `${x},${y}`
-    })
+    .map((value, index) => `${getX(index)},${getY(value)}`)
     .join(' ')
+
+  const areaPoints = [
+    `${getX(0)},${paddingTop + chartHeight}`,
+    points,
+    `${getX(values.length - 1)},${paddingTop + chartHeight}`,
+  ].join(' ')
+
+  const gridValues = Array.from(
+    { length: 5 },
+    (_, index) => lowerBound + (boundedRange * index) / 4,
+  ).reverse()
+
+  const labelIndexes = Array.from(
+    new Set([
+      0,
+      Math.floor((values.length - 1) / 3),
+      Math.floor(((values.length - 1) * 2) / 3),
+      values.length - 1,
+    ]),
+  )
 
   return (
     <svg
       className="resin-main-chart"
       viewBox={`0 0 ${width} ${height}`}
       role="img"
-      aria-label="Calculated resin pressure trend"
+      aria-label="Historical market trend"
     >
-      <line x1="0" y1="45" x2={width} y2="45" />
-      <line x1="0" y1="110" x2={width} y2="110" />
-      <line x1="0" y1="175" x2={width} y2="175" />
-      <polyline points={points} />
+      <defs>
+        <linearGradient
+          id="resin-chart-fill"
+          x1="0"
+          y1="0"
+          x2="0"
+          y2="1"
+        >
+          <stop offset="0%" stopColor="currentColor" stopOpacity="0.3" />
+          <stop offset="100%" stopColor="currentColor" stopOpacity="0" />
+        </linearGradient>
+      </defs>
 
-      {values.map((value, index) => {
-        const x = (index / Math.max(values.length - 1, 1)) * width
-        const y =
-          height - 18 - ((value - minimum) / range) * (height - 36)
+      {gridValues.map(value => {
+        const y = getY(value)
 
-        return <circle key={`${index}-${value}`} cx={x} cy={y} r="3" />
+        return (
+          <g key={value}>
+            <line
+              className="resin-chart-grid"
+              x1={paddingLeft}
+              y1={y}
+              x2={width - paddingRight}
+              y2={y}
+            />
+
+            <text
+              className="resin-chart-axis-label"
+              x={paddingLeft - 10}
+              y={y + 4}
+              textAnchor="end"
+            >
+              {value.toFixed(unit === 'EUR/USD' ? 4 : 2)}
+            </text>
+          </g>
+        )
       })}
+
+      <polygon
+        className="resin-chart-area"
+        points={areaPoints}
+        fill="url(#resin-chart-fill)"
+      />
+
+      <polyline className="resin-chart-line" points={points} />
+
+      {values.map((value, index) => (
+        <circle
+          key={`${index}-${value}`}
+          className="resin-chart-point"
+          cx={getX(index)}
+          cy={getY(value)}
+          r={index === values.length - 1 ? 5 : 3}
+        />
+      ))}
+
+      {labelIndexes.map(index => (
+        <text
+          key={index}
+          className="resin-chart-axis-label resin-chart-date-label"
+          x={getX(index)}
+          y={height - 10}
+          textAnchor={
+            index === 0
+              ? 'start'
+              : index === values.length - 1
+                ? 'end'
+                : 'middle'
+          }
+        >
+          {labels?.[index] ?? `${index + 1}`}
+        </text>
+      ))}
     </svg>
   )
 }
 
 export function ResinIntelligence() {
   const [selectedCode, setSelectedCode] = useState('ABS')
+  const [chartMode, setChartMode] =
+  useState<ChartMode>('pressure')
   const [period, setPeriod] = useState<Period>('1Y')
   const [drivers, setDrivers] =
     useState<MarketDriver[]>(fallbackDrivers)
@@ -312,12 +428,61 @@ export function ResinIntelligence() {
   const selected =
     signals.find(signal => signal.code === selectedCode) ?? signals[0]
 
-  const visibleHistory = useMemo(() => {
-    if (period === '30D') return selected.history.slice(-4)
-    if (period === '90D') return selected.history.slice(-7)
-    return selected.history
-  }, [period, selected])
+  const chartData = useMemo(() => {
+  if (chartMode === 'pressure') {
+    const pressureValues =
+      period === '30D'
+        ? selected.history.slice(-4)
+        : period === '90D'
+          ? selected.history.slice(-7)
+          : selected.history
 
+    return {
+      title: `${selected.code} calculated pressure`,
+      subtitle: 'SC360 composite upstream pressure index',
+      values: pressureValues,
+      labels: pressureValues.map((_, index) => `P${index + 1}`),
+      unit: 'Index',
+      source: 'SC360 calculated index',
+    }
+  }
+
+  const driver = drivers.find(item => item.id === chartMode)
+
+  const completeHistory = driver?.history ?? []
+
+  const requestedLength =
+    period === '30D'
+      ? 30
+      : period === '90D'
+        ? 90
+        : completeHistory.length
+
+  const history = completeHistory.slice(-requestedLength)
+
+  return {
+    title: driver?.name ?? 'Market driver',
+    subtitle: driver
+      ? `${driver.source} · latest observation ${driver.updatedAt}`
+      : 'Live source unavailable',
+    values: history.map(item => item.value),
+    labels: history.map(item => {
+      const date = new Date(`${item.period}T00:00:00`)
+
+      return Number.isNaN(date.getTime())
+        ? item.period
+        : date.toLocaleDateString(undefined, {
+            month: 'short',
+            day: 'numeric',
+          })
+    }),
+    unit:
+      driver?.id === 'eurusd'
+        ? 'EUR/USD'
+        : driver?.unit ?? '',
+    source: driver?.source ?? 'Unavailable',
+  }
+}, [chartMode, drivers, period, selected])
   const marketPressure = Math.round(
     signals.reduce((sum, signal) => sum + signal.pressure, 0) /
       signals.length,
@@ -452,55 +617,91 @@ export function ResinIntelligence() {
 
       <div className="resin-detail-grid">
         <article className="panel resin-chart-panel">
-          <div className="panel-head">
-            <div>
-              <span>Calculated resin pressure trend</span>
-              <h3>
-                {selected.code} · {selected.name}
-              </h3>
-            </div>
+  <div className="resin-chart-header">
+    <div>
+      <span className="resin-section-label">Market trend</span>
+      <h3>{chartData.title}</h3>
+      <p>{chartData.subtitle}</p>
+    </div>
 
-            <div className="resin-periods">
-              {(['30D', '90D', '1Y'] as Period[]).map(item => (
-                <button
-                  type="button"
-                  key={item}
-                  className={period === item ? 'active' : ''}
-                  onClick={() => setPeriod(item)}
-                >
-                  {item}
-                </button>
-              ))}
-            </div>
-          </div>
+    <div className="resin-chart-controls">
+      <div className="resin-chart-modes">
+        {(
+          [
+            ['pressure', 'Pressure index'],
+            ['brent', 'Brent'],
+            ['gas', 'Natural gas'],
+            ['eurusd', 'EUR/USD'],
+          ] as [ChartMode, string][]
+        ).map(([mode, label]) => (
+          <button
+            type="button"
+            key={mode}
+            className={chartMode === mode ? 'active' : ''}
+            onClick={() => setChartMode(mode)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
 
-          <TrendChart values={visibleHistory} />
+      <div className="resin-periods">
+        {(['30D', '90D', '1Y'] as Period[]).map(item => (
+          <button
+            type="button"
+            key={item}
+            className={period === item ? 'active' : ''}
+            onClick={() => setPeriod(item)}
+          >
+            {item}
+          </button>
+        ))}
+      </div>
+    </div>
+  </div>
 
-          <div className="resin-chart-summary">
-            <div>
-              <span>Calculated movement</span>
-              <strong>
-                {selected.change > 0 ? '+' : ''}
-                {selected.change.toFixed(2)}%
-              </strong>
-            </div>
+  <TrendChart
+    values={chartData.values}
+    labels={chartData.labels}
+    unit={chartData.unit}
+  />
 
-            <div>
-              <span>Pressure</span>
-              <strong>{selected.pressure}/100</strong>
-            </div>
+  <div className="resin-chart-footer">
+    <div>
+      <span>Latest value</span>
+      <strong>
+        {chartData.values.length
+          ? chartData.values[
+              chartData.values.length - 1
+            ].toLocaleString(undefined, {
+              minimumFractionDigits:
+                chartData.unit === 'EUR/USD' ? 4 : 2,
+              maximumFractionDigits:
+                chartData.unit === 'EUR/USD' ? 4 : 2,
+            })
+          : '—'}{' '}
+        <small>
+          {chartData.unit === 'Index' ? '' : chartData.unit}
+        </small>
+      </strong>
+    </div>
 
-            <div>
-              <span>Risk</span>
-              <strong>{selected.risk}</strong>
-            </div>
+    <div>
+      <span>Selected resin</span>
+      <strong>{selected.code}</strong>
+    </div>
 
-            <div>
-              <span>Method</span>
-              <strong>SC360 index</strong>
-            </div>
-          </div>
-        </article>
+    <div>
+      <span>Pressure score</span>
+      <strong>{selected.pressure}/100</strong>
+    </div>
+
+    <div>
+      <span>Source</span>
+      <strong>{chartData.source}</strong>
+    </div>
+  </div>
+</article>
 
         <aside className="panel resin-recommendation">
           <span className="eyebrow">SCOUT buyer assessment</span>
