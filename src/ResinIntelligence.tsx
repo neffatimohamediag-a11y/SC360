@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ResinScoreExplainer } from './ResinScoreExplainer'
+import { ResinDecisionSimulator } from './ResinDecisionSimulator'
 type Risk = 'Low' | 'Medium' | 'High' | 'Critical'
 type Period = '30D' | '90D' | '1Y'
 type ChartMode = 'pressure' | 'brent' | 'gas' | 'eurusd'
@@ -424,7 +425,16 @@ export function ResinIntelligence() {
   }, [])
 
   const signals = useMemo(() => calculateSignals(drivers), [drivers])
-
+const simulatorResins = signals.map(signal => ({
+  code: signal.code,
+  name: signal.name,
+  oilWeight: signal.oilWeight,
+  gasWeight: signal.gasWeight,
+  currencyWeight: signal.currencyWeight,
+  sensitivity: signal.sensitivity,
+  currentChange: signal.change,
+  currentPressure: signal.pressure,
+}))
   const selected =
     signals.find(signal => signal.code === selectedCode) ?? signals[0]
 const selectedDefinition =
@@ -855,4 +865,10 @@ const scoreContext = {
       </div>
     </section>
   )
+  
 }
+<ResinScoreExplainer context={scoreContext} />
+
+<ResinDecisionSimulator resins={simulatorResins} />
+
+<div className="resin-disclosure">
