@@ -99,7 +99,50 @@ function Dashboard({snapshots,onReset}:{snapshots:Analysis[];onReset:()=>void}){
  <header><div><span className="eyebrow">{view==='control'?(buyer==='ALL'?'Factory control room':'Planner workspace'):navItems.find(x=>x[0]===view)?.[1]} · {demoDays[day]?.[0]??full.compiledOn}</span><h1>{view==='control'?`Good morning, ${plannerName}.`:view==='missions'?'Turn constraints into recovery.':'Operational intelligence workspace'}</h1><p>{fmt(a.rowCount)} lines · {new Set(a.rows.map(r=>r.supplier)).size} suppliers · {a.constraints.length} active signals.</p></div><div className="header-actions"><select value={buyer} onChange={e=>setBuyer(e.target.value)}><option value="ALL">All Planners</option>{planners.map(p=><option key={p.buyer} value={p.buyer}>{p.name}</option>)}</select><div className="search"><Search/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search supplier, part or cell"/></div><button className="avatar">{buyer==='ALL'?'FM':buyer.slice(0,2)}</button></div></header>
  {view === 'resin' ? (
   <ResinIntelligence />
-) : view === 'decisions' ? (<DecisionCenter decisions={decisions} onUpdate={(id,patch)=>setDecisions(x=>x.map(d=>d.id===id?{...d,...patch,updatedAt:new Date().toISOString()}:d))} onOpenConstraint={selectMissionConstraint}/>:view==='missions'?<MissionCenter missions={missions} onUpdate={(id,patch)=>setMissions(x=>x.map(m=>m.id===id?{...m,...patch,updatedAt:new Date().toISOString()}:m))} onDelete={id=>setMissions(x=>x.filter(m=>m.id!==id))} onSelectConstraint={selectMissionConstraint}/>:<>
+) : view === 'decisions' ? (
+  <DecisionCenter
+    decisions={decisions}
+    onUpdate={(id, patch) =>
+      setDecisions(current =>
+        current.map(decision =>
+          decision.id === id
+            ? {
+                ...decision,
+                ...patch,
+                updatedAt: new Date().toISOString(),
+              }
+            : decision,
+        ),
+      )
+    }
+    onOpenConstraint={selectMissionConstraint}
+  />
+) : view === 'missions' ? (
+  <MissionCenter
+    missions={missions}
+    onUpdate={(id, patch) =>
+      setMissions(current =>
+        current.map(mission =>
+          mission.id === id
+            ? {
+                ...mission,
+                ...patch,
+                updatedAt: new Date().toISOString(),
+              }
+            : mission,
+        ),
+      )
+    }
+    onDelete={id =>
+      setMissions(current =>
+        current.filter(mission => mission.id !== id),
+      )
+    }
+    onSelectConstraint={selectMissionConstraint}
+  />
+) : (
+  <>
+  
  <section className="timeline">{snapshots.map((s,i)=><button key={s.compiledOn} className={day===i?'active':''} onClick={()=>setDay(i)}><span>{demoDays[i]?.[0]??`Day ${i+1}`}</span><strong>{s.compiledOn}</strong><small>{s.constraints.length} signals</small></button>)}</section>
  {view==='planners'&&<section className="panel planner-board standalone"><div className="panel-head"><div><span>Planner portfolio</span><h3>Five workspaces, one factory view</h3></div><UsersRound/></div><div className="planner-grid">{planners.map(p=><button key={p.buyer} onClick={()=>{setBuyer(p.buyer);setView('control')}}><div><strong>{p.name}</strong><small>{p.suppliers} suppliers · {p.parts} parts</small></div><b>{p.health}%</b><span>{p.critical} critical</span><em>{fmt(p.gap)} gap</em></button>)}</div></section>}
  {view==='suppliers'&&<section className="panel standalone"><div className="panel-head"><div><span>Supplier intelligence</span><h3>Supplier risk ranking</h3></div><Building2/></div><div className="rank-list large">{a.supplierRisks.map((x,i)=><div key={x.supplier}><b>{i+1}</b><div><strong>{x.supplier}</strong><small>{x.parts} parts · {x.cells} cells · {x.constraints} signals</small></div><span>{fmt(x.gap)} gap</span><Pill level={x.level}/></div>)}</div></section>}
