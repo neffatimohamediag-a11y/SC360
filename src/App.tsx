@@ -97,9 +97,9 @@ function Dashboard({snapshots,onReset}:{snapshots:Analysis[];onReset:()=>void}){
  const navItems:[View,string,JSX.Element][]=[['control','Control Room',['resin', 'Resin Intelligence', <MarketIcon />],<CircleGauge/>],['decisions',`Decision Center${decisions.filter(d=>d.status==='Pending Approval').length?` (${decisions.filter(d=>d.status==='Pending Approval').length})`:''}`,<DecisionIcon/>],['planners','Planner Workspaces',<UsersRound/>],['missions',`Mission Center${missions.length?` (${missions.length})`:''}`,<ShieldAlert/>],['suppliers','Suppliers',<Building2/>],['cells','Production Cells',<Factory/>],['snapshots','Snapshots',<CalendarDays/>]]
  return <div className="app"><aside className="sidebar"><div className="brand light"><div className="logo">SC</div><div><strong>SC360</strong><span>Demo Factory v0.8.0</span></div></div><nav>{navItems.map(([id,label,icon])=><button key={id} className={view===id?'active':''} onClick={()=>nav(id)}>{icon}{label}</button>)}</nav><div className="side-foot"><span>Active source</span><strong><FileSpreadsheet/>{full.fileName}</strong><small>{full.compiledOn} · {full.rowCount} lines</small><button onClick={onReset}><RefreshCw/>Exit control room</button></div></aside><main className="content">
  <header><div><span className="eyebrow">{view==='control'?(buyer==='ALL'?'Factory control room':'Planner workspace'):navItems.find(x=>x[0]===view)?.[1]} · {demoDays[day]?.[0]??full.compiledOn}</span><h1>{view==='control'?`Good morning, ${plannerName}.`:view==='missions'?'Turn constraints into recovery.':'Operational intelligence workspace'}</h1><p>{fmt(a.rowCount)} lines · {new Set(a.rows.map(r=>r.supplier)).size} suppliers · {a.constraints.length} active signals.</p></div><div className="header-actions"><select value={buyer} onChange={e=>setBuyer(e.target.value)}><option value="ALL">All Planners</option>{planners.map(p=><option key={p.buyer} value={p.buyer}>{p.name}</option>)}</select><div className="search"><Search/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search supplier, part or cell"/></div><button className="avatar">{buyer==='ALL'?'FM':buyer.slice(0,2)}</button></div></header>
- {view === 'resin' ? (
-  <ResinIntelligence />
-) : view === 'decisions' ? (
+ {view === 'resin' && <ResinIntelligence />}
+
+{view === 'decisions' && (
   <DecisionCenter
     decisions={decisions}
     onUpdate={(id, patch) =>
@@ -117,7 +117,9 @@ function Dashboard({snapshots,onReset}:{snapshots:Analysis[];onReset:()=>void}){
     }
     onOpenConstraint={selectMissionConstraint}
   />
-) : view === 'missions' ? (
+)}
+
+{view === 'missions' && (
   <MissionCenter
     missions={missions}
     onUpdate={(id, patch) =>
@@ -140,30 +142,617 @@ function Dashboard({snapshots,onReset}:{snapshots:Analysis[];onReset:()=>void}){
     }
     onSelectConstraint={selectMissionConstraint}
   />
-) : (
-  <>
-  
- <section className="timeline">{snapshots.map((s,i)=><button key={s.compiledOn} className={day===i?'active':''} onClick={()=>setDay(i)}><span>{demoDays[i]?.[0]??`Day ${i+1}`}</span><strong>{s.compiledOn}</strong><small>{s.constraints.length} signals</small></button>)}</section>
- {view==='planners'&&<section className="panel planner-board standalone"><div className="panel-head"><div><span>Planner portfolio</span><h3>Five workspaces, one factory view</h3></div><UsersRound/></div><div className="planner-grid">{planners.map(p=><button key={p.buyer} onClick={()=>{setBuyer(p.buyer);setView('control')}}><div><strong>{p.name}</strong><small>{p.suppliers} suppliers · {p.parts} parts</small></div><b>{p.health}%</b><span>{p.critical} critical</span><em>{fmt(p.gap)} gap</em></button>)}</div></section>}
- {view==='suppliers'&&<section className="panel standalone"><div className="panel-head"><div><span>Supplier intelligence</span><h3>Supplier risk ranking</h3></div><Building2/></div><div className="rank-list large">{a.supplierRisks.map((x,i)=><div key={x.supplier}><b>{i+1}</b><div><strong>{x.supplier}</strong><small>{x.parts} parts · {x.cells} cells · {x.constraints} signals</small></div><span>{fmt(x.gap)} gap</span><Pill level={x.level}/></div>)}</div></section>}
- {view==='cells'&&<section className="panel standalone"><div className="panel-head"><div><span>Production cell intelligence</span><h3>Cell risk ranking</h3></div><Factory/></div><div className="rank-list large">{a.cellRisks.map((x,i)=><div key={x.cell}><b>{i+1}</b><div><strong>Cell {x.cell}</strong><small>{x.parts} parts · {x.suppliers} suppliers · {x.constraints} signals</small></div><span>{fmt(x.gap)} gap</span><Pill level={x.level}/></div>)}</div></section>}
- {view==='snapshots'&&<section className="snapshot-grid standalone">{snapshots.map((s,i)=><article className="panel" key={s.compiledOn}><span>{demoDays[i]?.[0]??`Snapshot ${i+1}`}</span><h3>{s.compiledOn}</h3><strong>{s.constraints.length} signals</strong><small>{s.rowCount} rows · {s.supplierRisks.length} suppliers at risk</small><button onClick={()=>{setDay(i);setView('control')}}>Open snapshot <ArrowRight/></button></article>)}</section>}
- {view==='control'&&<>
- <section className="brief"><div><span className="eyebrow">SCOUT morning briefing</span><h2>{changes.newCount} new · {changes.worseningCount} worsening · {changes.resolvedCount} resolved.</h2><p>{topCell&&topSupplier?`Start with Cell ${topCell.cell}. ${topSupplier.supplier} is the highest-risk supplier for this workspace. ${critical} critical signals remain open.`:'No operational constraint is visible for this workspace.'}</p></div><div className="objective"><span>First recommended mission</span><strong>{selected?.recommendedAction??'Review the planner portfolio'}</strong><button onClick={()=>document.getElementById('queue')?.scrollIntoView({behavior:'smooth'})}>Open mission queue <ArrowRight/></button></div></section>
- <section className="change-strip"><article><b>+{changes.newCount}</b><span>New</span></article><article><b>{changes.worseningCount}</b><span>Worsening</span></article><article><b>{changes.improvingCount}</b><span>Improving</span></article><article><b>-{changes.resolvedCount}</b><span>Resolved</span></article><article><b>{changes.stableCount}</b><span>Stable</span></article></section>
- <section className="kpis"><article><span>Factory health</span><strong>{health}%</strong><small><CircleGauge/> Snapshot-derived</small></article><article><span>Critical constraints</span><strong>{critical}</strong><small><AlertTriangle/> {a.constraints.length} total signals</small></article><article><span>Current-week gap</span><strong>{fmt(currentGap)}</strong><small><PackageSearch/> units requiring review</small></article><article><span>Suppliers at risk</span><strong>{a.supplierRisks.length}</strong><small><Building2/> {topSupplier?.supplier??'None'}</small></article><article><span>Open missions</span><strong>{missions.filter(m=>!['Recovered','Closed'].includes(m.status)).length}</strong><small><ShieldAlert/> persisted locally</small></article></section>
- {buyer==='ALL'&&<section className="panel planner-board"><div className="panel-head"><div><span>Planner portfolio</span><h3>Five workspaces, one factory view</h3></div><UsersRound/></div><div className="planner-grid">{planners.map(p=><button key={p.buyer} onClick={()=>setBuyer(p.buyer)}><div><strong>{p.name}</strong><small>{p.suppliers} suppliers · {p.parts} parts</small></div><b>{p.health}%</b><span>{p.critical} critical</span><em>{fmt(p.gap)} gap</em></button>)}</div></section>}
- <section className="risk-grid"><article className="panel"><div className="panel-head"><div><span>Supplier intelligence</span><h3>Who should be called first?</h3></div><button className="link-icon" onClick={()=>setView('suppliers')}><ChevronRight/></button></div><div className="rank-list">{a.supplierRisks.slice(0,5).map((x,i)=><div key={x.supplier}><b>{i+1}</b><div><strong>{x.supplier}</strong><small>{x.parts} parts · {x.cells} cells · {x.constraints} signals</small></div><span>{fmt(x.gap)} gap</span><Pill level={x.level}/></div>)}</div></article><article className="panel"><div className="panel-head"><div><span>Production cell intelligence</span><h3>Where could production feel it?</h3></div><button className="link-icon" onClick={()=>setView('cells')}><ChevronRight/></button></div><div className="rank-list">{a.cellRisks.slice(0,5).map((x,i)=><div key={x.cell}><b>{i+1}</b><div><strong>Cell {x.cell}</strong><small>{x.parts} parts · {x.suppliers} suppliers · {x.constraints} signals</small></div><span>{fmt(x.gap)} gap</span><Pill level={x.level}/></div>)}</div></article></section>
- <section className="scenario panel"><div><span className="eyebrow">Scenario Studio</span><h3>Inject a controlled event</h3><p>Preview how the selected workspace would respond. The original requirement snapshot remains unchanged.</p></div><div>{['Supplier Delay','Demand Spike','ASN Received','Quality Hold','Transport Delay','Capacity Loss'].map(x=><button className={scenario===x?'active':''} key={x} onClick={()=>inject(x)}>{x}</button>)}</div></section>
- <section className="queue-layout" id="queue"><article className="panel queue"><div className="panel-head"><div><span>Constraint queue</span><h3>Work ordered by operational urgency</h3></div><div className="filters"><Filter/><button className={level==='all'?'sel':''} onClick={()=>setLevel('all')}>All</button>{(['critical','high','medium'] as RiskLevel[]).map(l=><button key={l} className={level===l?'sel':''} onClick={()=>setLevel(l)}>{l}</button>)}</div></div><div className="table-head"><span>Priority</span><span>Lifecycle</span><span>Supplier / Part</span><span>Cell</span><span>Gap</span><span>Risk</span></div><div className="rows">{visible.slice(0,80).map(c=><button key={c.id} className={selected?.id===c.id?'selected':''} onClick={()=>setSelected(c)}><b>{c.score}</b><div><strong className={`status-${c.changeStatus}`}>{c.changeStatus??'stable'}</strong><small>{c.type}</small></div><div><strong>{c.supplier}</strong><small>{c.partNo} · {c.description}</small></div><span>Cell {c.cell}</span><span>{fmt(c.gap)}</span><Pill level={c.level}/></button>)}</div></article><aside className="panel detail">{selected?<><div className="detail-top"><Pill level={selected.level}/><button onClick={()=>setSelected(null)}><X/></button></div><span className="eyebrow">SCOUT mission assessment</span><h3>{selected.type}: {selected.partNo}</h3><p>{selected.reason}</p><dl><div><dt>Planner</dt><dd>{selected.row.userName||selected.row.buyer}</dd></div><div><dt>Supplier</dt><dd>{selected.supplier}</dd></div><div><dt>Production cell</dt><dd>{selected.cell}</dd></div><div><dt>Lifecycle</dt><dd>{selected.changeStatus??'stable'}</dd></div><div><dt>Calculated gap</dt><dd>{fmt(selected.gap)}</dd></div><div><dt>Previous gap</dt><dd>{selected.previousGap==null?'—':fmt(selected.previousGap)}</dd></div></dl><div className="recommend"><span>Recommended next action</span><strong>{selected.recommendedAction}</strong></div>{selected.row.supplierMessage&&<blockquote>“{selected.row.supplierMessage}”<small>Supplier message</small></blockquote>}<button className="recovery-button" onClick={()=>setRecoveryTarget(selected)}><Sparkles/>Review recovery options <ArrowRight/></button><button className="primary" onClick={()=>setMissionTarget(selected)}><Plus/>Create recovery mission <ArrowRight/></button>{missions.some(m=>m.constraintKey===selected.key)&&<button className="mission-existing" onClick={()=>setView('missions')}><CheckCircle2/>Mission already created — open Mission Center</button>}</>:<div className="empty">Select a constraint to review SCOUT’s assessment.</div>}</aside></section>
- <section className="import-note"><CheckCircle2/><div><strong>Snapshot validated successfully</strong><span>{a.rowCount} rows · {a.weekLabels.length} demand buckets · {planners.length} planner portfolios</span></div>{scenario&&<small>Scenario preview active: {scenario}</small>}</section>
- </>
-)}</main>{recoveryTarget&&<RecoveryModal constraint={recoveryTarget} onClose={()=>setRecoveryTarget(null)} onEscalate={escalateDecision}/>} {missionTarget&&<MissionModal constraint={missionTarget} onClose={()=>setMissionTarget(null)} onSave={createMission}/>}</div>
-}
+)}
 
-export function App(){
- const [snapshots,setSnapshots]=useState<Analysis[]>([]),[loading,setLoading]=useState(false),[error,setError]=useState('')
- async function load(f:File){setLoading(true);setError('');try{setSnapshots([await analyseFile(f)])}catch(e){setError(e instanceof Error?e.message:'The file could not be analysed.')}finally{setLoading(false)}}
- async function demo(){setLoading(true);setError('');try{const all:Analysis[]=[];for(const [,d] of demoDays){const r=await fetch(`./demo/requirement_Demo_${d}.xlsx`);if(!r.ok)throw new Error(`Demo snapshot ${d} is missing.`);all.push(await analyseBuffer(await r.arrayBuffer(),`requirement_Demo_${d}.xlsx`))}setSnapshots(all)}catch(e){setError(e instanceof Error?e.message:'Demo Factory could not be loaded.')}finally{setLoading(false)}}
- return snapshots.length?<Dashboard snapshots={snapshots} onReset={()=>setSnapshots([])}/>:<Upload onLoad={load} onDemo={demo} loading={loading} error={error}/>
+{view !== 'resin' &&
+  view !== 'decisions' &&
+  view !== 'missions' && (
+    <>
+      <section className="timeline">
+        {snapshots.map((s, i) => (
+          <button
+            key={s.compiledOn}
+            className={day === i ? 'active' : ''}
+            onClick={() => setDay(i)}
+          >
+            <span>{demoDays[i]?.[0] ?? `Day ${i + 1}`}</span>
+            <strong>{s.compiledOn}</strong>
+            <small>{s.constraints.length} signals</small>
+          </button>
+        ))}
+      </section>
+
+      {view === 'planners' && (
+        <section className="panel planner-board standalone">
+          <div className="panel-head">
+            <div>
+              <span>Planner portfolio</span>
+              <h3>Five workspaces, one factory view</h3>
+            </div>
+            <UsersRound />
+          </div>
+
+          <div className="planner-grid">
+            {planners.map(p => (
+              <button
+                key={p.buyer}
+                onClick={() => {
+                  setBuyer(p.buyer)
+                  setView('control')
+                }}
+              >
+                <div>
+                  <strong>{p.name}</strong>
+                  <small>
+                    {p.suppliers} suppliers · {p.parts} parts
+                  </small>
+                </div>
+
+                <b>{p.health}%</b>
+                <span>{p.critical} critical</span>
+                <em>{fmt(p.gap)} gap</em>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {view === 'suppliers' && (
+        <section className="panel standalone">
+          <div className="panel-head">
+            <div>
+              <span>Supplier intelligence</span>
+              <h3>Supplier risk ranking</h3>
+            </div>
+            <Building2 />
+          </div>
+
+          <div className="rank-list large">
+            {a.supplierRisks.map((x, i) => (
+              <div key={x.supplier}>
+                <b>{i + 1}</b>
+
+                <div>
+                  <strong>{x.supplier}</strong>
+                  <small>
+                    {x.parts} parts · {x.cells} cells · {x.constraints}{' '}
+                    signals
+                  </small>
+                </div>
+
+                <span>{fmt(x.gap)} gap</span>
+                <Pill level={x.level} />
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {view === 'cells' && (
+        <section className="panel standalone">
+          <div className="panel-head">
+            <div>
+              <span>Production cell intelligence</span>
+              <h3>Cell risk ranking</h3>
+            </div>
+            <Factory />
+          </div>
+
+          <div className="rank-list large">
+            {a.cellRisks.map((x, i) => (
+              <div key={x.cell}>
+                <b>{i + 1}</b>
+
+                <div>
+                  <strong>Cell {x.cell}</strong>
+                  <small>
+                    {x.parts} parts · {x.suppliers} suppliers ·{' '}
+                    {x.constraints} signals
+                  </small>
+                </div>
+
+                <span>{fmt(x.gap)} gap</span>
+                <Pill level={x.level} />
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {view === 'snapshots' && (
+        <section className="snapshot-grid standalone">
+          {snapshots.map((s, i) => (
+            <article className="panel" key={s.compiledOn}>
+              <span>{demoDays[i]?.[0] ?? `Snapshot ${i + 1}`}</span>
+              <h3>{s.compiledOn}</h3>
+              <strong>{s.constraints.length} signals</strong>
+
+              <small>
+                {s.rowCount} rows · {s.supplierRisks.length} suppliers at
+                risk
+              </small>
+
+              <button
+                onClick={() => {
+                  setDay(i)
+                  setView('control')
+                }}
+              >
+                Open snapshot <ArrowRight />
+              </button>
+            </article>
+          ))}
+        </section>
+      )}
+
+      {view === 'control' && (
+        <>
+          <section className="brief">
+            <div>
+              <span className="eyebrow">SCOUT morning briefing</span>
+
+              <h2>
+                {changes.newCount} new · {changes.worseningCount}{' '}
+                worsening · {changes.resolvedCount} resolved.
+              </h2>
+
+              <p>
+                {topCell && topSupplier
+                  ? `Start with Cell ${topCell.cell}. ${topSupplier.supplier} is the highest-risk supplier for this workspace. ${critical} critical signals remain open.`
+                  : 'No operational constraint is visible for this workspace.'}
+              </p>
+            </div>
+
+            <div className="objective">
+              <span>First recommended mission</span>
+
+              <strong>
+                {selected?.recommendedAction ??
+                  'Review the planner portfolio'}
+              </strong>
+
+              <button
+                onClick={() =>
+                  document
+                    .getElementById('queue')
+                    ?.scrollIntoView({ behavior: 'smooth' })
+                }
+              >
+                Open mission queue <ArrowRight />
+              </button>
+            </div>
+          </section>
+
+          <section className="change-strip">
+            <article>
+              <b>+{changes.newCount}</b>
+              <span>New</span>
+            </article>
+
+            <article>
+              <b>{changes.worseningCount}</b>
+              <span>Worsening</span>
+            </article>
+
+            <article>
+              <b>{changes.improvingCount}</b>
+              <span>Improving</span>
+            </article>
+
+            <article>
+              <b>-{changes.resolvedCount}</b>
+              <span>Resolved</span>
+            </article>
+
+            <article>
+              <b>{changes.stableCount}</b>
+              <span>Stable</span>
+            </article>
+          </section>
+
+          <section className="kpis">
+            <article>
+              <span>Factory health</span>
+              <strong>{health}%</strong>
+              <small>
+                <CircleGauge /> Snapshot-derived
+              </small>
+            </article>
+
+            <article>
+              <span>Critical constraints</span>
+              <strong>{critical}</strong>
+              <small>
+                <AlertTriangle /> {a.constraints.length} total signals
+              </small>
+            </article>
+
+            <article>
+              <span>Current-week gap</span>
+              <strong>{fmt(currentGap)}</strong>
+              <small>
+                <PackageSearch /> units requiring review
+              </small>
+            </article>
+
+            <article>
+              <span>Suppliers at risk</span>
+              <strong>{a.supplierRisks.length}</strong>
+              <small>
+                <Building2 /> {topSupplier?.supplier ?? 'None'}
+              </small>
+            </article>
+
+            <article>
+              <span>Open missions</span>
+
+              <strong>
+                {
+                  missions.filter(
+                    m => !['Recovered', 'Closed'].includes(m.status),
+                  ).length
+                }
+              </strong>
+
+              <small>
+                <ShieldAlert /> persisted locally
+              </small>
+            </article>
+          </section>
+
+          {buyer === 'ALL' && (
+            <section className="panel planner-board">
+              <div className="panel-head">
+                <div>
+                  <span>Planner portfolio</span>
+                  <h3>Five workspaces, one factory view</h3>
+                </div>
+                <UsersRound />
+              </div>
+
+              <div className="planner-grid">
+                {planners.map(p => (
+                  <button
+                    key={p.buyer}
+                    onClick={() => setBuyer(p.buyer)}
+                  >
+                    <div>
+                      <strong>{p.name}</strong>
+                      <small>
+                        {p.suppliers} suppliers · {p.parts} parts
+                      </small>
+                    </div>
+
+                    <b>{p.health}%</b>
+                    <span>{p.critical} critical</span>
+                    <em>{fmt(p.gap)} gap</em>
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
+
+          <section className="risk-grid">
+            <article className="panel">
+              <div className="panel-head">
+                <div>
+                  <span>Supplier intelligence</span>
+                  <h3>Who should be called first?</h3>
+                </div>
+
+                <button
+                  className="link-icon"
+                  onClick={() => setView('suppliers')}
+                >
+                  <ChevronRight />
+                </button>
+              </div>
+
+              <div className="rank-list">
+                {a.supplierRisks.slice(0, 5).map((x, i) => (
+                  <div key={x.supplier}>
+                    <b>{i + 1}</b>
+
+                    <div>
+                      <strong>{x.supplier}</strong>
+                      <small>
+                        {x.parts} parts · {x.cells} cells ·{' '}
+                        {x.constraints} signals
+                      </small>
+                    </div>
+
+                    <span>{fmt(x.gap)} gap</span>
+                    <Pill level={x.level} />
+                  </div>
+                ))}
+              </div>
+            </article>
+
+            <article className="panel">
+              <div className="panel-head">
+                <div>
+                  <span>Production cell intelligence</span>
+                  <h3>Where could production feel it?</h3>
+                </div>
+
+                <button
+                  className="link-icon"
+                  onClick={() => setView('cells')}
+                >
+                  <ChevronRight />
+                </button>
+              </div>
+
+              <div className="rank-list">
+                {a.cellRisks.slice(0, 5).map((x, i) => (
+                  <div key={x.cell}>
+                    <b>{i + 1}</b>
+
+                    <div>
+                      <strong>Cell {x.cell}</strong>
+                      <small>
+                        {x.parts} parts · {x.suppliers} suppliers ·{' '}
+                        {x.constraints} signals
+                      </small>
+                    </div>
+
+                    <span>{fmt(x.gap)} gap</span>
+                    <Pill level={x.level} />
+                  </div>
+                ))}
+              </div>
+            </article>
+          </section>
+
+          <section className="scenario panel">
+            <div>
+              <span className="eyebrow">Scenario Studio</span>
+              <h3>Inject a controlled event</h3>
+
+              <p>
+                Preview how the selected workspace would respond. The
+                original requirement snapshot remains unchanged.
+              </p>
+            </div>
+
+            <div>
+              {[
+                'Supplier Delay',
+                'Demand Spike',
+                'ASN Received',
+                'Quality Hold',
+                'Transport Delay',
+                'Capacity Loss',
+              ].map(x => (
+                <button
+                  className={scenario === x ? 'active' : ''}
+                  key={x}
+                  onClick={() => inject(x)}
+                >
+                  {x}
+                </button>
+              ))}
+            </div>
+          </section>
+
+          <section className="queue-layout" id="queue">
+            <article className="panel queue">
+              <div className="panel-head">
+                <div>
+                  <span>Constraint queue</span>
+                  <h3>Work ordered by operational urgency</h3>
+                </div>
+
+                <div className="filters">
+                  <Filter />
+
+                  <button
+                    className={level === 'all' ? 'sel' : ''}
+                    onClick={() => setLevel('all')}
+                  >
+                    All
+                  </button>
+
+                  {(['critical', 'high', 'medium'] as RiskLevel[]).map(
+                    l => (
+                      <button
+                        key={l}
+                        className={level === l ? 'sel' : ''}
+                        onClick={() => setLevel(l)}
+                      >
+                        {l}
+                      </button>
+                    ),
+                  )}
+                </div>
+              </div>
+
+              <div className="table-head">
+                <span>Priority</span>
+                <span>Lifecycle</span>
+                <span>Supplier / Part</span>
+                <span>Cell</span>
+                <span>Gap</span>
+                <span>Risk</span>
+              </div>
+
+              <div className="rows">
+                {visible.slice(0, 80).map(c => (
+                  <button
+                    key={c.id}
+                    className={selected?.id === c.id ? 'selected' : ''}
+                    onClick={() => setSelected(c)}
+                  >
+                    <b>{c.score}</b>
+
+                    <div>
+                      <strong className={`status-${c.changeStatus}`}>
+                        {c.changeStatus ?? 'stable'}
+                      </strong>
+                      <small>{c.type}</small>
+                    </div>
+
+                    <div>
+                      <strong>{c.supplier}</strong>
+                      <small>
+                        {c.partNo} · {c.description}
+                      </small>
+                    </div>
+
+                    <span>Cell {c.cell}</span>
+                    <span>{fmt(c.gap)}</span>
+                    <Pill level={c.level} />
+                  </button>
+                ))}
+              </div>
+            </article>
+
+            <aside className="panel detail">
+              {selected ? (
+                <>
+                  <div className="detail-top">
+                    <Pill level={selected.level} />
+
+                    <button onClick={() => setSelected(null)}>
+                      <X />
+                    </button>
+                  </div>
+
+                  <span className="eyebrow">
+                    SCOUT mission assessment
+                  </span>
+
+                  <h3>
+                    {selected.type}: {selected.partNo}
+                  </h3>
+
+                  <p>{selected.reason}</p>
+
+                  <dl>
+                    <div>
+                      <dt>Planner</dt>
+                      <dd>
+                        {selected.row.userName || selected.row.buyer}
+                      </dd>
+                    </div>
+
+                    <div>
+                      <dt>Supplier</dt>
+                      <dd>{selected.supplier}</dd>
+                    </div>
+
+                    <div>
+                      <dt>Production cell</dt>
+                      <dd>{selected.cell}</dd>
+                    </div>
+
+                    <div>
+                      <dt>Lifecycle</dt>
+                      <dd>{selected.changeStatus ?? 'stable'}</dd>
+                    </div>
+
+                    <div>
+                      <dt>Calculated gap</dt>
+                      <dd>{fmt(selected.gap)}</dd>
+                    </div>
+
+                    <div>
+                      <dt>Previous gap</dt>
+                      <dd>
+                        {selected.previousGap == null
+                          ? '—'
+                          : fmt(selected.previousGap)}
+                      </dd>
+                    </div>
+                  </dl>
+
+                  <div className="recommend">
+                    <span>Recommended next action</span>
+                    <strong>{selected.recommendedAction}</strong>
+                  </div>
+
+                  {selected.row.supplierMessage && (
+                    <blockquote>
+                      “{selected.row.supplierMessage}”
+                      <small>Supplier message</small>
+                    </blockquote>
+                  )}
+
+                  <button
+                    className="recovery-button"
+                    onClick={() => setRecoveryTarget(selected)}
+                  >
+                    <Sparkles />
+                    Review recovery options
+                    <ArrowRight />
+                  </button>
+
+                  <button
+                    className="primary"
+                    onClick={() => setMissionTarget(selected)}
+                  >
+                    <Plus />
+                    Create recovery mission
+                    <ArrowRight />
+                  </button>
+
+                  {missions.some(
+                    m => m.constraintKey === selected.key,
+                  ) && (
+                    <button
+                      className="mission-existing"
+                      onClick={() => setView('missions')}
+                    >
+                      <CheckCircle2 />
+                      Mission already created — open Mission Center
+                    </button>
+                  )}
+                </>
+              ) : (
+                <div className="empty">
+                  Select a constraint to review SCOUT&apos;s assessment.
+                </div>
+              )}
+            </aside>
+          </section>
+
+          <section className="import-note">
+            <CheckCircle2 />
+
+            <div>
+              <strong>Snapshot validated successfully</strong>
+
+              <span>
+                {a.rowCount} rows · {a.weekLabels.length} demand buckets
+                · {planners.length} planner portfolios
+              </span>
+            </div>
+
+            {scenario && (
+              <small>Scenario preview active: {scenario}</small>
+            )}
+          </section>
+        </>
+      )}
+    </>
+  )}
+</main>
+
+{recoveryTarget && (
+  <RecoveryModal
+    constraint={recoveryTarget}
+    onClose={() => setRecoveryTarget(null)}
+    onEscalate={escalateDecision}
+  />
+)}
+
+{missionTarget && (
+  <MissionModal
+    constraint={missionTarget}
+    onClose={() => setMissionTarget(null)}
+    onSave={createMission}
+  />
+)}
+</div>
+)
 }
